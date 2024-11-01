@@ -20,15 +20,13 @@ export class CouponController {
   static getInstance(
     couponService: CouponService,
     couponUsageService: CouponUsageService,
-    cartService: CartService,
-    orderService: OrderService
+    cartService: CartService
   ) {
     if (!this.instance) {
       this.instance = new CouponController(
         couponService,
         couponUsageService,
-        cartService,
-        orderService
+        cartService
       );
     }
     return this.instance;
@@ -37,65 +35,67 @@ export class CouponController {
   private constructor(
     private couponService: CouponService,
     private couponUsageService: CouponUsageService,
-    private cartService: CartService,
-    private orderService: OrderService
+    private cartService: CartService
   ) {}
 
-  async createCoupon(req: Request, res: Response, next: NextFunction) {
-    const { authorizationName, discount, expirationDate, isSubs } = req.body;
+  async createCoupon(req: Request, res: Response) {
+    const {
+      authorizationName,
+      discount,
+      expirationDate,
+      isSubs,
+      trialDuration,
+      isOnlyForOneCompany,
+    } = req.body;
+
+    if (trialDuration && !isSubs) {
+      throw new NotAuthorizedError(i18n.__("trial_duration_only_for_subs"));
+    }
+
+    if (trialDuration && discount < 100) {
+      throw new NotAuthorizedError(
+        i18n.__("trial_duration_only_for_100_discount")
+      );
+    }
 
     const stripeApi = new Stripe(process.env.STRIPE_RESTRICTED_KEY!);
 
-    let session: mongoose.ClientSession | null = null;
-    try {
-      session = await mongoose.startSession();
-      session.startTransaction();
+    const existingCouponCode = await this.couponService.getActiveCouponByCode(
+      authorizationName
+    );
 
-      const existingCouponCode = await this.couponService.getActiveCouponByCode(
-        `${authorizationName}-${discount}`
-      );
-
-      if (existingCouponCode) {
-        throw new NotAuthorizedError(i18n.__("coupon_code_already_exists"));
-      }
-
-      const result = await this.couponService.createCoupon(
-        {
-          authorizationName,
-          discount,
-          expirationDate,
-          isSubs,
-        },
-        session
-      );
-      const now = moment();
-      const durationInMonth = moment(expirationDate).diff(now, "months");
-
-      if (isSubs && durationInMonth < 1) {
-        throw new NotAuthorizedError(i18n.__("coupon_duration_invalid"));
-      }
-
-      const stripeCoupon = await stripeApi.coupons.create({
-        percent_off: discount,
-        duration: isSubs ? "repeating" : "once",
-        duration_in_months: isSubs
-          ? moment(expirationDate).diff(now, "months")
-          : undefined,
-        id: result._id.toString(),
-        name: result.code,
-        redeem_by: Math.floor(new Date(expirationDate).getTime() / 1000),
-      });
-      await session.commitTransaction();
-      session.endSession();
-      res.send(result);
-    } catch (err: any) {
-      if (session) {
-        console.log(err);
-        await session.abortTransaction();
-        session.endSession();
-      }
-      return next(err);
+    if (existingCouponCode) {
+      throw new NotAuthorizedError(i18n.__("coupon_code_already_exists"));
     }
+
+    const now = moment();
+    const durationInMonth = moment(expirationDate).diff(now, "months");
+
+    if (isSubs && durationInMonth < 1) {
+      throw new NotAuthorizedError(i18n.__("coupon_duration_invalid"));
+    }
+
+    const result = await this.couponService.createCoupon({
+      authorizationName,
+      discount,
+      expirationDate,
+      isSubs,
+      trialDuration,
+      isOnlyForOneCompany,
+    });
+
+    await stripeApi.coupons.create({
+      percent_off: discount,
+      duration: isSubs ? "repeating" : "once",
+      duration_in_months: isSubs
+        ? moment(expirationDate).diff(now, "months")
+        : undefined,
+      id: result._id.toString(),
+      name: result.code,
+      redeem_by: Math.floor(new Date(expirationDate).getTime() / 1000),
+    });
+
+    res.send(result);
   }
 
   async useCoupon(req: Request, res: Response) {
@@ -123,25 +123,48 @@ export class CouponController {
       throw new NotAuthorizedError(i18n.__("coupon_deactivated"));
     }
 
+    if (coupon.isOnlyForOneCompany) {
+      await Promise.all(
+        existingCart.items.map((item: any) => {
+          if (
+            item.packageGroupId.type === SubscriptionsType.GENERAL_CONSULTANCY
+          ) {
+            throw new NotAuthorizedError(i18n.__("coupon_only_used_for_subs"));
+          }
+        })
+      );
+    }
+
     const usedCoupon = await this.couponUsageService.checkCouponUsage({
       couponId: coupon._id,
       userId,
       cartItems: existingCart.items,
     });
 
-    if (usedCoupon?.isUsed) {
+    if (coupon?.isOnlyForOneCompany) {
+      const usedCouponByCompany =
+        await this.couponUsageService.chekcCouponUsageForOneTime(coupon._id);
+
+      if (usedCouponByCompany) {
+        throw new NotAuthorizedError(i18n.__("coupon_only_for_one_company"));
+      }
+    }
+
+    if (usedCoupon?.isUsed && coupon.isSingleUse) {
       throw new NotAuthorizedError(i18n.__("coupon_already_used"));
     }
 
     existingCart.items.forEach((item: any) => {
       if (
         item.packageGroupId.type === SubscriptionsType.INMIDI_SUBS &&
-        !coupon.isSubs
+        !coupon.isSubs &&
+        !coupon.trialDuration
       ) {
         throw new NotAuthorizedError(i18n.__("coupon_not_applicable"));
       } else if (
         item.packageGroupId.type === SubscriptionsType.GENERAL_CONSULTANCY &&
-        coupon.isSubs
+        coupon.isSubs &&
+        coupon.trialDuration
       ) {
         throw new NotAuthorizedError(i18n.__("coupon_not_applicable"));
       }

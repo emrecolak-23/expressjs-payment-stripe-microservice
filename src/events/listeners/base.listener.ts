@@ -12,7 +12,6 @@ type ValidationSchema = {
 };
 export abstract class Listener<T = any> {
   abstract queueName: string;
-  abstract onMessage(data: T, type: string, msg: amqp.ConsumeMessage): void;
   channel: Channel;
   emitter: EventEmitter;
   constructor(channel: Channel, emitter: EventEmitter) {
@@ -29,7 +28,6 @@ export abstract class Listener<T = any> {
           this.channel.nack(msg, false, false);
           return;
         }
-        this.onMessage(message.body, message.type, msg);
         this.emitter.emit(message.type, message.body, msg);
       }
     });

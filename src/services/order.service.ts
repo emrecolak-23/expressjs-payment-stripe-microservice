@@ -50,7 +50,7 @@ class OrderService {
       })
       .populate({
         path: "subscriptions.packageGroupId",
-        select: "title isSeatable type",
+        select: "title isSeatable type discount",
       })
       .sort({ createdAt: -1 })
       .lean();
@@ -63,7 +63,8 @@ class OrderService {
       .findOne({ _id: new Types.ObjectId(orderId) })
       .populate({
         path: "subscriptions.packageGroupId",
-        select: "title explanation currency icon isSeatable numberOfSeats",
+        select:
+          "title explanation currency icon isSeatable numberOfSeats discount",
       })
       .lean();
   }

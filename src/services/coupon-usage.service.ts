@@ -24,6 +24,22 @@ export class CouponUsageService {
     this.couponUsageModel = CouponUsage;
   }
 
+  async chekcCouponUsageForOneTime(couponId: Types.ObjectId) {
+    const usedCoupon = await this.couponUsageModel.findOne({
+      couponId,
+      isUsed: true,
+    });
+
+    return usedCoupon;
+  }
+
+  async updateCouponUsed(couponId: Types.ObjectId, cartId: Types.ObjectId) {
+    return await this.couponUsageModel.findOneAndUpdate(
+      { couponId, cartId },
+      { isUsed: true }
+    );
+  }
+
   async checkCouponUsage(params: Partial<UseCouponDto>) {
     const { couponId, userId, cartItems } = params;
 
@@ -38,6 +54,12 @@ export class CouponUsageService {
     });
 
     return usedCoupon;
+  }
+
+  async deleteCouponUsage(cartId: string) {
+    return await this.couponUsageModel.deleteOne({
+      cartId: new Types.ObjectId(cartId),
+    });
   }
 
   async checkCouponExistInCart(params: Partial<UseCouponDto>) {
@@ -71,7 +93,6 @@ export class CouponUsageService {
   }
 
   async getCurrentCartCoupon(cartId: string, userId: number) {
-    console.log(userId, cartId);
     const existingCouponUsage:
       | (Exclude<CouponUsageDoc, "couponId"> & {
           couponId: CouponDoc;

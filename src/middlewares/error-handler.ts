@@ -8,13 +8,19 @@ export const errorHandler = async (
   res: Response,
   next: NextFunction
 ) => {
-  if (err instanceof CustomError) {
-    return res
-      .status(err.statusCode)
-      .json(new ErrorResponse("custom error", err.serializeErrors()));
+  if (res.headersSent) {
+    return next(err); // Pass the error to the default Express error handler
   }
 
-  res
-    .status(400)
-    .json(new ErrorResponse(err.message, [{ message: err.message }]));
+  if (err instanceof CustomError) {
+    res
+      .status(err.statusCode)
+      .json(new ErrorResponse("custom error", err.serializeErrors()));
+  } else {
+    res
+      .status(400)
+      .json(
+        new ErrorResponse("Something went wrong", [{ message: err.message }])
+      );
+  }
 };

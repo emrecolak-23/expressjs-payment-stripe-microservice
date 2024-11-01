@@ -45,42 +45,35 @@ class CartController {
       );
 
     if (!existingPackageGroup) {
-      throw new NotFoundError(i18n.__("package_group_not_found"));
+      return res
+        .status(404)
+        .json({ message: i18n.__("package_group_not_found") });
     }
 
     if (
       existingPackageGroup.type === SubscriptionsType.INMIDI_SUBS &&
       !durationType
     ) {
-      throw new BadRequestError(i18n.__("duration_type_required"));
+      return res
+        .status(400)
+        .json({ message: i18n.__("duration_type_required") });
     } else if (
       existingPackageGroup.type === SubscriptionsType.GENERAL_CONSULTANCY &&
       !numberOfSeats
     ) {
-      throw new BadRequestError(i18n.__("number_of_seats_required"));
+      return res
+        .status(400)
+        .json({ message: i18n.__("number_of_seats_required") });
     }
-
-    const existingCart = await this.cartService.getCart(customerId);
-
-    existingCart?.items.forEach((item: ICartItem) => {
-      if (typeof item.packageGroupId === "string") {
-        if (item.packageGroupId !== packageGroupId) {
-          throw new BadRequestError(i18n.__("other_package_already_added"));
-        }
-      } else if (
-        item.packageGroupId._id &&
-        item.packageGroupId._id.toString() !== packageGroupId
-      ) {
-        throw new BadRequestError(i18n.__("other_package_already_added"));
-      }
-    });
+    const isCartExist = await this.cartService.checkCartIsExist(customerId);
 
     const totalPrice = await this.subscriptionPackageService.calculatePrice({
       packageGroupId,
       numberOfSeats,
       durationType,
     });
-    if (!existingCart) {
+    console.log("-----------", isCartExist, "-----------");
+    if (!isCartExist) {
       const cart = await this.cartService.addToCart({
         customerId,
         items: [
@@ -96,12 +89,34 @@ class CartController {
       return res.status(201).json(cart);
     }
 
+    let existingCart = await this.cartService.getCart(customerId);
+    console.log(totalPrice, "totalPrice");
+
+    console.log(existingCart, "existingCart");
+
+    existingCart?.items.forEach((item: ICartItem) => {
+      if (typeof item.packageGroupId === "string") {
+        if (item.packageGroupId !== packageGroupId) {
+          return res
+            .status(400)
+            .json({ message: i18n.__("other_package_already_added") });
+        }
+      } else if (
+        item.packageGroupId._id &&
+        item.packageGroupId._id.toString() !== packageGroupId
+      ) {
+        return res
+          .status(400)
+          .json({ message: i18n.__("other_package_already_added") });
+      }
+    });
+
     const existingPackage =
       await this.subscriptionPackageService.getSubscriptionPackage(
         packageGroupId
       );
 
-    const existingItem = existingCart.items.find((item: ICartItem) => {
+    const existingItem = existingCart!.items.find((item: ICartItem) => {
       if (typeof item.packageGroupId === "string") {
         return item.packageGroupId === packageGroupId;
       } else if (item.packageGroupId._id) {
@@ -111,20 +126,20 @@ class CartController {
     });
 
     if (!existingPackage) {
-      throw new NotFoundError(i18n.__("package_not_found"));
+      return res.status(404).json({ message: i18n.__("package_not_found") });
     }
 
     if (existingPackage.type === SubscriptionsType.GENERAL_CONSULTANCY) {
       if (existingItem) {
-        const index = existingCart.items.indexOf(existingItem);
+        const index = existingCart!.items.indexOf(existingItem);
         if (numberOfSeats > 0) {
-          existingCart.items[index].numberOfSeats += numberOfSeats;
-          existingCart.items[index].price += totalPrice!;
+          existingCart!.items[index].numberOfSeats += numberOfSeats;
+          existingCart!.items[index].price += totalPrice!;
         } else {
-          existingCart.items.splice(index, 1);
+          existingCart!.items.splice(index, 1);
         }
       } else {
-        existingCart.items.push({
+        existingCart!.items.push({
           packageGroupId,
           unitPrice: existingPackageGroup.price,
           numberOfSeats,
@@ -135,12 +150,14 @@ class CartController {
       existingPackage.type === SubscriptionsType.INMIDI_SUBS &&
       existingItem
     ) {
-      throw new BadRequestError(i18n.__("package_already_added"));
+      return res
+        .status(400)
+        .json({ message: i18n.__("package_already_added") });
     } else if (
       existingPackage.type === SubscriptionsType.INMIDI_SUBS &&
       !existingItem
     ) {
-      existingCart.items.push({
+      existingCart!.items.push({
         packageGroupId,
         unitPrice: existingPackageGroup.price,
         durationType,
@@ -148,12 +165,19 @@ class CartController {
       });
     }
 
-    await existingCart.save();
+    await existingCart!.save();
     res.status(200).json(existingCart);
   }
 
   async getCart(req: Request, res: Response) {
     const customerId = req.currentUser.id;
+
+    const isCartExist = await this.cartService.checkCartIsExist(customerId);
+
+    if (!isCartExist) {
+      return res.status(200).json({});
+    }
+
     let cart = await this.cartService.getCartByCustomerId(customerId);
 
     if (!cart) {
@@ -190,6 +214,7 @@ class CartController {
     if (!cart) {
       throw new NotFoundError(i18n.__("cart_not_found"));
     }
+
     const existingItem = cart.items.find((item: ICartItem) => {
       if (typeof item.packageGroupId === "string") {
         return item.packageGroupId === packageGroupId;
@@ -203,6 +228,12 @@ class CartController {
     const index = cart.items.indexOf(existingItem);
     cart.items.splice(index, 1);
     await cart.save();
+
+    if (cart.items.length === 0) {
+      await this.cartService.deleteCouponFromCart(cart._id);
+      await this.couponUsageService.deleteCouponUsage(cart._id);
+    }
+
     res.status(200).json({ message: i18n.__("item_deleted") });
   }
 

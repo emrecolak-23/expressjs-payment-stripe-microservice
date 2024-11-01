@@ -9,20 +9,13 @@ import mongoose from "mongoose";
 import { UserPayload } from "./types/user";
 
 // Import Routes
-import {
-  paymentRoutes,
-  orderRoutes,
-  cartRoutes,
-  checkoutRoutes,
-  portalRotues,
-  couponRoutes,
-} from "./routes";
-
+import { routes } from "./routes";
 // Import Middlewares
 import { errorHandler, translations } from "./middlewares";
 
 // Import Errors
 import { NotFoundError } from "./errors/not-found-error";
+import swaggerDocs from "./utils/swagger";
 
 if (process.env.NODE_ENV !== "production") {
   dotenv.config({ path: path.join(__dirname, "../.env.dev") });
@@ -45,6 +38,7 @@ export interface CustomRequest extends Request {
 }
 
 const app = express();
+
 app.get("/payments-inmidi/healthcheck", async (req: Request, res: Response) => {
   const healtStatus: Record<string, string> = { status: "OK" };
   try {
@@ -75,12 +69,9 @@ app.use(
   })
 );
 app.use(cors());
-app.use("/inmidi-payments", paymentRoutes());
-app.use("/inmidi-order", orderRoutes());
-app.use("/inmidi-cart", cartRoutes());
-app.use("/checkout", checkoutRoutes());
-app.use("/inmidi-portal", portalRotues());
-app.use("/inmidi-coupon", couponRoutes());
+swaggerDocs(app, process.env.PORT ? parseInt(process.env.PORT) : 3000);
+
+app.use("/", routes);
 
 app.all("*", (req: Request, res: Response, next: NextFunction) => {
   console.log("Route not found");

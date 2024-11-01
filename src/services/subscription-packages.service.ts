@@ -37,10 +37,15 @@ class SubscriptionPackageService {
     let totalPrice = 0;
 
     if (subscriptionPackage.type === SubscriptionsType.GENERAL_CONSULTANCY) {
-      totalPrice = numberOfSeats! * subscriptionPackage.price;
+      totalPrice =
+        numberOfSeats! *
+        (subscriptionPackage.price -
+          (subscriptionPackage.price * subscriptionPackage.discount!) / 100);
     } else if (subscriptionPackage.type === SubscriptionsType.INMIDI_SUBS) {
       if (durationType === 1) {
-        totalPrice = subscriptionPackage.price;
+        totalPrice =
+          subscriptionPackage.price -
+          (subscriptionPackage.price * subscriptionPackage.discount!) / 100;
       } else if (durationType === 12) {
         totalPrice =
           subscriptionPackage.price * 12 -

@@ -1,0 +1,970 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "CV Service API",
+    "version": "1.0.0",
+    "description": "API for file control service"
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Authentication using Bearer token"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/inmidi-cart/cart": {
+      "post": {
+        "tags": [
+          "Inmidi Carts"
+        ],
+        "summary": "Add an item to the cart",
+        "description": "Adds a specified item to the user's cart.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "packageGroupId": {
+                    "type": "string"
+                  },
+                  "durationType": {
+                    "type": "integer"
+                  },
+                  "numberOfSeats": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item added to the cart successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customerId": {
+                      "type": "integer",
+                      "example": 21704
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "packageGroupId": {
+                            "type": "string",
+                            "example": "65959fa528f6c0e9a8cbc4a8"
+                          },
+                          "unitPrice": {
+                            "type": "number",
+                            "example": 149
+                          },
+                          "durationType": {
+                            "type": "integer",
+                            "example": 1
+                          },
+                          "price": {
+                            "type": "number",
+                            "example": 149
+                          },
+                          "_id": {
+                            "type": "string",
+                            "example": "672137ffdebbebe7626fd695"
+                          }
+                        }
+                      }
+                    },
+                    "_id": {
+                      "type": "string",
+                      "example": "672137ffdebbebe7626fd694"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "example": "2024-10-29T19:31:11.359Z"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "example": "2024-10-29T19:31:11.359Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Inmidi Carts"
+        ],
+        "summary": "Get the user's cart",
+        "description": "Retrieves the current state of the user's shopping cart.",
+        "responses": {
+          "200": {
+            "description": "Successful response with cart details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string",
+                      "example": "672137ffdebbebe7626fd694"
+                    },
+                    "totalPrice": {
+                      "type": "number",
+                      "example": 149
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "_id": {
+                            "type": "string",
+                            "example": "65959fa528f6c0e9a8cbc4a8"
+                          },
+                          "title": {
+                            "type": "string",
+                            "example": "Inmidi Abonelik Paketi"
+                          },
+                          "icon": {
+                            "type": "string",
+                            "example": "company"
+                          },
+                          "type": {
+                            "type": "string",
+                            "example": "INMIDI_SUBS"
+                          },
+                          "isSeatable": {
+                            "type": "boolean",
+                            "example": false
+                          },
+                          "price": {
+                            "type": "object",
+                            "properties": {
+                              "price": {
+                                "type": "number",
+                                "example": 149
+                              },
+                              "totalPrice": {
+                                "type": "number",
+                                "example": 149
+                              },
+                              "currency": {
+                                "type": "string",
+                                "example": "EUR"
+                              },
+                              "currencyPrefix": {
+                                "type": "string",
+                                "example": "€"
+                              },
+                              "durationType": {
+                                "type": "integer",
+                                "example": 1
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "cartDiscountedPrice": {
+                      "type": "number",
+                      "example": 149
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cart not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Inmidi Carts"
+        ],
+        "summary": "Delete the user's shopping cart",
+        "description": "Removes all items from the user's shopping cart.",
+        "responses": {
+          "200": {
+            "description": "Successful response indicating the cart was deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Alışveriş sepeti silindi"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cart not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-cart/cart/{packageGroupId}": {
+      "patch": {
+        "tags": [
+          "Inmidi Carts"
+        ],
+        "summary": "Update an item in the user's shopping cart",
+        "description": "Updates the number of seats for a specified item in the user's shopping cart.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "packageGroupId",
+            "required": true,
+            "description": "The ID of the package group to update.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "numberOfSeats": {
+                    "type": "integer",
+                    "example": 2
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response indicating the cart item was updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Sepet öğesi güncellendi"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found in the cart"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Inmidi Carts"
+        ],
+        "summary": "Delete an item from the user's shopping cart",
+        "description": "Removes a specified item from the user's shopping cart.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "packageGroupId",
+            "required": true,
+            "description": "The ID of the package group to delete.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response indicating the cart item was deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Sepet öğesi silindi"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found in the cart"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-cart/cart-items-number": {
+      "get": {
+        "tags": [
+          "Inmidi Carts"
+        ],
+        "summary": "Get the number of items in the user's shopping cart",
+        "description": "Retrieves the total number of items currently in the user's shopping cart.",
+        "responses": {
+          "200": {
+            "description": "Successful response with the number of cart items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "integer",
+                      "example": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cart not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-coupon/use-coupon": {
+      "post": {
+        "tags": [
+          "Inmidi Coupon Usage"
+        ],
+        "summary": "Apply a coupon to the user's cart",
+        "description": "Applies a specified coupon code to the user's cart and returns the updated cart details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cartId": {
+                    "type": "string",
+                    "example": "6721414de5ee8a0a1246535a"
+                  },
+                  "couponCode": {
+                    "type": "string",
+                    "example": "assa"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response with updated cart details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "_id": {
+                          "type": "string",
+                          "example": "6721414de5ee8a0a1246535a"
+                        },
+                        "customerId": {
+                          "type": "integer",
+                          "example": 21704
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "packageGroupId": {
+                                "type": "object",
+                                "properties": {
+                                  "_id": {
+                                    "type": "string",
+                                    "example": "65959fa528f6c0e9a8cbc4a8"
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "example": "INMIDI_SUBS"
+                                  }
+                                }
+                              },
+                              "unitPrice": {
+                                "type": "number",
+                                "example": 149
+                              },
+                              "durationType": {
+                                "type": "integer",
+                                "example": 1
+                              },
+                              "price": {
+                                "type": "number",
+                                "example": 149
+                              },
+                              "_id": {
+                                "type": "string",
+                                "example": "6721414de5ee8a0a1246535b"
+                              }
+                            }
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "example": "2024-10-29T20:10:53.270Z"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "example": "2024-10-29T20:11:34.538Z"
+                        },
+                        "discount": {
+                          "type": "number",
+                          "example": 100
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request, invalid coupon or cart ID"
+          },
+          "404": {
+            "description": "Cart not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-coupon/cancel-coupon": {
+      "post": {
+        "tags": [
+          "Inmidi Coupon Usage"
+        ],
+        "summary": "Cancel the usage of a coupon in the user's cart",
+        "description": "Cancels the application of a specified coupon code in the user's cart and returns the updated cart details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cartId": {
+                    "type": "string",
+                    "example": "6721414de5ee8a0a1246535a"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response with updated cart details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "_id": {
+                          "type": "string",
+                          "example": "6721414de5ee8a0a1246535a"
+                        },
+                        "customerId": {
+                          "type": "integer",
+                          "example": 21704
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "packageGroupId": {
+                                "type": "object",
+                                "properties": {
+                                  "_id": {
+                                    "type": "string",
+                                    "example": "65959fa528f6c0e9a8cbc4a8"
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "example": "INMIDI_SUBS"
+                                  }
+                                }
+                              },
+                              "unitPrice": {
+                                "type": "number",
+                                "example": 149
+                              },
+                              "durationType": {
+                                "type": "integer",
+                                "example": 1
+                              },
+                              "price": {
+                                "type": "number",
+                                "example": 149
+                              },
+                              "_id": {
+                                "type": "string",
+                                "example": "6721414de5ee8a0a1246535b"
+                              }
+                            }
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "example": "2024-10-29T20:10:53.270Z"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "example": "2024-10-29T20:13:39.697Z"
+                        },
+                        "discount": {
+                          "type": "number",
+                          "example": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request, invalid cart ID"
+          },
+          "404": {
+            "description": "Cart not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-coupon/coupon": {
+      "post": {
+        "tags": [
+          "Inmidi Coupon Usage"
+        ],
+        "summary": "Retrieve the current coupon for the user's cart",
+        "description": "Gets the coupon details associated with the user's cart.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cartId": {
+                    "type": "string",
+                    "example": "6721414de5ee8a0a1246535a"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response with coupon details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "couponId": {
+                          "type": "string",
+                          "example": "66fd927c6a4125cf9e11e728"
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "assa"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request, invalid cart ID"
+          },
+          "404": {
+            "description": "Coupon not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-coupon/coupon-code-usage": {
+      "post": {
+        "tags": [
+          "Inmidi Coupon Usage"
+        ],
+        "summary": "Get coupon code usage details",
+        "description": "Retrieves the usage details of a specified coupon code.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "couponCode": {
+                    "type": "string",
+                    "example": "assa"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response with coupon usage details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "couponCode": {
+                        "type": "string",
+                        "example": "assa"
+                      },
+                      "authorizedName": {
+                        "type": "string",
+                        "example": "assa"
+                      },
+                      "usedCount": {
+                        "type": "integer",
+                        "example": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request, invalid coupon code"
+          },
+          "404": {
+            "description": "Coupon code not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-coupon/all": {
+      "post": {
+        "tags": [
+          "Inmidi Coupon Usage"
+        ],
+        "summary": "Get all coupons with pagination and filtering",
+        "description": "Retrieves a paginated list of all coupons based on search and sorting criteria.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "example": 20
+                  },
+                  "search": {
+                    "type": "string",
+                    "example": "Test"
+                  },
+                  "sort": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer"
+                    },
+                    "example": {
+                      "createdAt": -1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response with list of coupons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "row": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "_id": {
+                            "type": "string",
+                            "example": "67214371df7064c497e0d313"
+                          },
+                          "code": {
+                            "type": "string",
+                            "example": "Test40"
+                          },
+                          "authorizationName": {
+                            "type": "string",
+                            "example": "Test40"
+                          },
+                          "discount": {
+                            "type": "integer",
+                            "example": 100
+                          },
+                          "expirationDate": {
+                            "type": "string",
+                            "example": "2024-12-11T12:46:17.811Z"
+                          },
+                          "isActive": {
+                            "type": "boolean",
+                            "example": true
+                          },
+                          "isSingleUse": {
+                            "type": "boolean",
+                            "example": false
+                          },
+                          "isSubs": {
+                            "type": "boolean",
+                            "example": true
+                          },
+                          "isOnlyForOneCompany": {
+                            "type": "boolean",
+                            "example": false
+                          }
+                        }
+                      }
+                    },
+                    "totalCount": {
+                      "type": "integer",
+                      "example": 119
+                    },
+                    "page": {
+                      "type": "integer",
+                      "example": 1
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "example": 20
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request due to invalid input"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-coupon/{id}": {
+      "get": {
+        "tags": [
+          "Inmidi Coupon Usage"
+        ],
+        "summary": "Get a coupon by ID",
+        "description": "Retrieves a coupon based on the specified ID.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "The ID of the coupon to retrieve.",
+            "schema": {
+              "type": "string",
+              "example": "66bcff1f8d3ce0c8f3398dd6"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with coupon details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string",
+                      "example": "66bcff1f8d3ce0c8f3398dd6"
+                    },
+                    "code": {
+                      "type": "string",
+                      "example": "BIR-ŞİRKET-HIZMET-50"
+                    },
+                    "authorizationName": {
+                      "type": "string",
+                      "example": "BIR-ŞİRKET-HIZMET-50"
+                    },
+                    "discount": {
+                      "type": "integer",
+                      "example": 50
+                    },
+                    "expirationDate": {
+                      "type": "string",
+                      "example": "2024-11-20T21:00:00.000Z"
+                    },
+                    "isActive": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "isSingleUse": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "isSubs": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "isOnlyForOneCompany": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Coupon not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/inmidi-coupon/deactivate": {
+      "post": {
+        "tags": [
+          "Inmidi Coupon Usage"
+        ],
+        "summary": "Deactivate a coupon",
+        "description": "Deactivates a coupon based on the provided coupon ID.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "couponId": {
+                    "type": "string",
+                    "example": "66bcff1f8d3ce0c8f3398dd6"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response indicating the coupon was deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "couponId": {
+                      "type": "string",
+                      "example": "66bcff1f8d3ce0c8f3398dd6"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Coupon not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  },
+  "tags": []
+}

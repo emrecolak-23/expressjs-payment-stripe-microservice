@@ -9,12 +9,13 @@ import {
   CartService,
   PaymentService,
   CouponService,
+  CouponUsageService,
 } from "../services";
 import { SubscriptionsType } from "../types/subscription";
 import SuccessResponse from "../responses/success-response";
 import { i18n } from "../middlewares";
 import { FlattenMaps, Types } from "mongoose";
-import { OrderDoc } from "../models";
+import { CouponDoc, OrderDoc } from "../models";
 
 interface ResultItem {
   packageGroupId: string;
@@ -34,7 +35,8 @@ class OrderController {
     subscriptionService: SubscriptionPackageService,
     cartService: CartService,
     paymentsService: PaymentService,
-    couponService: CouponService
+    couponService: CouponService,
+    couponUsageService: CouponUsageService
   ) {
     if (!this.instance) {
       this.instance = new OrderController(
@@ -42,7 +44,8 @@ class OrderController {
         subscriptionService,
         cartService,
         paymentsService,
-        couponService
+        couponService,
+        couponUsageService
       );
     }
     return this.instance;
@@ -53,7 +56,8 @@ class OrderController {
     private subscriptionService: SubscriptionPackageService,
     private cartService: CartService,
     private paymentsService: PaymentService,
-    private couponService: CouponService
+    private couponService: CouponService,
+    private couponUsageService: CouponUsageService
   ) {}
 
   async createOrder(req: Request, res: Response) {
@@ -65,6 +69,7 @@ class OrderController {
     let cartItems;
     let discount = 0;
     let couponId: string | undefined;
+    let coupon: CouponDoc | null;
 
     if (!packages) {
       const cart = await this.cartService.getCartById(cartId);
@@ -73,7 +78,7 @@ class OrderController {
       }
 
       if (cart?.couponId) {
-        const coupon = await this.couponService.getCouponById(cart.couponId);
+        coupon = await this.couponService.getCouponById(cart.couponId);
         const currentDate = new Date();
 
         if (!coupon) {
@@ -82,6 +87,19 @@ class OrderController {
 
         if (coupon?.expirationDate < currentDate) {
           throw new NotAuthorizedError(i18n.__("coupon_expired"));
+        }
+
+        if (coupon.isOnlyForOneCompany) {
+          const isCouponUsed =
+            await this.couponUsageService.chekcCouponUsageForOneTime(
+              coupon._id
+            );
+
+          if (isCouponUsed) {
+            throw new NotAuthorizedError(
+              i18n.__("coupon_only_for_one_company")
+            );
+          }
         }
       }
       cartItems = cart.items;
@@ -116,11 +134,13 @@ class OrderController {
           };
         } else if (existingPackage!.type === SubscriptionsType.INMIDI_SUBS) {
           let startsAt = moment.utc().startOf("day").toDate();
-          let endsAt = moment
-            .utc()
-            .add(durationType, "months")
-            .endOf("day")
-            .toDate();
+          let endsAt = coupon?.trialDuration
+            ? moment
+                .utc()
+                .add(coupon.trialDuration, "months")
+                .endOf("day")
+                .toDate()
+            : moment.utc().add(durationType, "months").endOf("day").toDate();
 
           let totalPrice = (await this.subscriptionService.calculatePrice({
             packageGroupId,
@@ -130,7 +150,9 @@ class OrderController {
 
           return {
             packageGroupId,
-            unitPrice: existingPackage.price,
+            unitPrice:
+              existingPackage.price -
+              (existingPackage.price * existingPackage.discount!) / 100,
             price: totalPrice,
             durationType,
             startsAt,

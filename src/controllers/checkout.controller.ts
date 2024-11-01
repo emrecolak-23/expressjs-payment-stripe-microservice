@@ -9,6 +9,7 @@ import {
   CartService,
   SubscriptionPackageService,
   CouponService,
+  CouponUsageService,
 } from "../services";
 
 import { NotFoundError } from "../errors/not-found-error";
@@ -25,6 +26,7 @@ import { OrderStatus } from "../types/orders";
 import { SubscriptionsType } from "../types/subscription";
 import { OrderDoc, PaymentsDoc } from "../models";
 import { CouponDoc } from "../models";
+import { allowedCountryCodes } from "../constants";
 
 class CheckoutController {
   constructor(
@@ -33,12 +35,14 @@ class CheckoutController {
     private companyService: CompanyService,
     private cartService: CartService,
     private packagesService: SubscriptionPackageService,
-    private couponService: CouponService
+    private couponService: CouponService,
+    private couponUsageService: CouponUsageService
   ) {}
 
   async createCheckoutSession(req: Request, res: Response) {
     const { orderId } = req.body;
     const { id: customerId } = req.currentUser;
+    console.log(customerId, "customerId");
     const domainUrl = process.env.WEB_APP_URL;
     const accepLanguage = "de";
 
@@ -61,8 +65,20 @@ class CheckoutController {
       if (coupon!.expirationDate < currentDate) {
         throw new NotAuthorizedError(i18n.__("coupon_expired"));
       }
+
+      if (coupon.isOnlyForOneCompany) {
+        console.log("i am here");
+        const isUsedCoupon =
+          await this.couponUsageService.chekcCouponUsageForOneTime(coupon._id);
+
+        if (isUsedCoupon) {
+          throw new NotAuthorizedError(i18n.__("coupon_only_for_one_company"));
+        }
+      }
     }
+
     let stripeCoupon: Stripe.Coupon | null = null;
+    let subsDiscount: number = 0;
     const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] =
       await Promise.all(
         existingOrder.subscriptions.map(async (item: any) => {
@@ -72,6 +88,7 @@ class CheckoutController {
                 coupon._id.toString()
               );
             }
+
             const translations =
               await this.packagesService.getTranslatedPackage(
                 {
@@ -97,15 +114,28 @@ class CheckoutController {
                 coupon._id.toString()
               );
             }
+
+            if (item.packageGroupId.discount) {
+              stripeCoupon = await stripeApi.coupons.create({
+                percent_off: item.packageGroupId.discount,
+                duration: "once",
+                name: item.packageGroupId.title + " " + customerId,
+              });
+
+              subsDiscount = item.packageGroupId.discount;
+            }
+
             const prices = await stripeApi.prices.list({
               active: true,
             });
             const price = prices.data.find(
               (price) => price.nickname === SubscriptionsType.INMIDI_SUBS
             );
+
             paymentMode = "subscription";
+
             return {
-              price: price?.id,
+              price: price!.id,
               quantity: 1,
             };
           }
@@ -130,8 +160,13 @@ class CheckoutController {
         },
       });
     }
+
     const stripeSessionObj: Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: ["card"],
+      payment_method_types:
+        (coupon?.discount === 100 && coupon?.trialDuration) ||
+        subsDiscount === 100
+          ? []
+          : ["card"],
       ...(paymentMode === "payment"
         ? {
             invoice_creation: {
@@ -146,11 +181,40 @@ class CheckoutController {
         : {}),
       line_items,
       mode: paymentMode,
+      ...(subsDiscount === 100
+        ? {
+            subscription_data: {
+              trial_settings: {
+                end_behavior: {
+                  missing_payment_method: "cancel",
+                },
+              },
+              trial_period_days: 30 * 1,
+            },
+          }
+        : {}),
+      ...(coupon?.discount === 100 && coupon?.trialDuration && coupon.isSubs
+        ? {
+            subscription_data: {
+              trial_settings: {
+                end_behavior: {
+                  missing_payment_method: "cancel",
+                },
+              },
+              trial_period_days: 30 * coupon.trialDuration,
+            },
+          }
+        : {}),
+      ...(coupon?.discount === 100 && coupon.isSubs
+        ? { payment_method_collection: "if_required" }
+        : {}),
+      locale: accepLanguage,
       success_url: `${domainUrl}/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${domainUrl}/dashboard/payment/cancel`,
       customer: customer.id,
-      shipping_address_collection: { allowed_countries: ["TR", "GB", "DE"] },
-      ...(existingOrder.couponId && {
+      billing_address_collection: undefined,
+      shipping_address_collection: undefined,
+      ...((existingOrder.couponId || subsDiscount) && {
         discounts: [{ coupon: stripeCoupon!.id }],
       }),
     };
@@ -180,42 +244,56 @@ class CheckoutController {
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
     let event: Stripe.Event;
 
-    try {
-      event = stripeApi.webhooks.constructEvent(
-        req["rawBody"]!,
-        sig,
-        endpointSecret
+    event = stripeApi.webhooks.constructEvent(
+      req["rawBody"]!,
+      sig,
+      endpointSecret
+    );
+    console.log(event.type, "event type");
+    if (event.type === "checkout.session.completed") {
+      if (!event.data.object.success_url?.includes("inmidi")) {
+        return res.status(200).json({
+          received: false,
+          message: "Isteyim webhook event",
+        });
+      }
+
+      const customerStripeId = event.data.object.customer;
+      const stripeCustomer: any = await stripeApi.customers.retrieve(
+        customerStripeId as string
       );
 
-      if (event.type === "checkout.session.completed") {
-        if (!event.data.object.success_url?.includes("inmidi")) {
-          return res.json({
-            received: false,
-            message: "Isteyim webhook event",
-          });
-        }
-        const customerStripeId = event.data.object.customer;
-        const stripeCustomer: any = await stripeApi.customers.retrieve(
-          customerStripeId as string
+      const customer =
+        await this.companyService.findCompanyByAuthorizedPersonEmail(
+          stripeCustomer.email as string
         );
+      if (!customer) {
+        return res.status(404).json({ message: "customer not found" });
+      }
 
-        const customer =
-          await this.companyService.findCompanyByAuthorizedPersonEmail(
-            stripeCustomer.email as string
-          );
+      const payment = await this.paymentService.getPaymentByCustomerId(
+        customer?.companyId
+      );
+      if (!payment) {
+        console.log("payment not found");
+        return res.status(200).json({ message: "Payment not found" });
+      }
 
-        if (!customer) {
-          throw new NotFoundError("customer not fount");
-        }
-        const payment = await this.paymentService.getPaymentByCustomerId(
-          customer?.companyId
+      const order = await this.orderService.getOrderById(payment.orderId);
+
+      const cart: any = await this.cartService.getCarByCustomerId(
+        payment.customerId
+      );
+      if (cart?.couponId) {
+        await this.couponUsageService.updateCouponUsed(
+          cart?.couponId,
+          cart._id
         );
+      }
 
-        if (!payment) {
-          return res.status(200).json({ message: "Payment not found" });
-        }
+      await this.cartService.deleteCartByCustomerId(payment.customerId);
 
-        const order = await this.orderService.getOrderById(payment.orderId);
+      await Promise.all(
         order!.subscriptions.map(async (subscription: any) => {
           if (subscription.packageGroupId.isSeatable) {
             await this.paymentService.updatePaymentStatus(
@@ -226,148 +304,192 @@ class CheckoutController {
               payment.orderId,
               OrderStatus.PAID
             );
-
-            await this.cartService.deleteCartByCustomerId(payment.customerId);
-
-            new PaymentsCreatedPublisher(channel, ["payments-created"]).publish(
-              {
-                messageId: uuidv4(),
-                type: "PAYMENTS_CREATED",
-                body: {
-                  packageGroupId: subscription.packageGroupId._id,
-                  customerId: payment.customerId,
-                  numberOfSeats: subscription.numberOfSeats,
-                  paymentId: payment._id.toString(),
-                },
-              }
-            );
-
-            new EventNotificationPublisher(channel).publish({
+            await new PaymentsCreatedPublisher(channel, [
+              "payments-created",
+            ]).publish({
               messageId: uuidv4(),
-              type: "NOTIFICATION_EVENT",
+              type: "PAYMENTS_CREATED",
               body: {
-                text: `inmidi kullanıcısı ${customer.authorizedPersonName} ${subscription.packageGroupId.title} aldı.`,
-                title: `Paket satın aldı`,
-                type: "COMPANY_INFO",
+                packageGroupId: subscription.packageGroupId._id,
+                customerId: payment.customerId,
+                numberOfSeats: subscription.numberOfSeats,
+                paymentId: payment._id.toString(),
               },
             });
-          }
-        });
-      } else if (event.type === "customer.subscription.updated") {
-        const eventData = event.data.object;
-        const subscriptionId = eventData.id;
-        const subscriptionStart = eventData.current_period_start;
-        const subscriptionEnd = eventData.current_period_end;
-
-        const formattedCurrentPeriodEnd = new Date(
-          subscriptionEnd * 1000
-        ).toISOString();
-        const formattedCurrentPeriodStart = new Date(
-          subscriptionStart * 1000
-        ).toISOString();
-
-        const subscription: any = await stripeApi.subscriptions.retrieve(
-          subscriptionId as string,
-          {
-            expand: ["latest_invoice"],
-          }
-        );
-
-        if (subscription.plan.nickname === SubscriptionsType.INMIDI_SUBS) {
-          const packages = await this.packagesService.getPackageByType(
-            subscription.plan.nickname
-          );
-
-          const stripeCustomer: any = await stripeApi.customers.retrieve(
-            subscription.customer as string
-          );
-
-          const customer =
-            await this.companyService.findCompanyByAuthorizedPersonEmail(
-              stripeCustomer.email as string
-            );
-
-          if (!customer) {
-            throw new NotFoundError(i18n.__("customer_not_found"));
-          }
-
-          if (eventData.cancel_at_period_end) {
-            return res.status(200).json({ received: true });
-          }
-
-          let payment: PaymentsDoc | null =
-            await this.paymentService.getPaymentByCustomerId(
-              customer?.companyId
-            );
-
-          let order: Partial<OrderDoc> | null = null;
-
-          if (payment) {
-            console.log("order updated in webhook");
-
-            order = await this.orderService.getOrderById(payment.orderId);
-            await this.orderService.updateOrderStatus(
-              order!._id,
-              OrderStatus.PAID
-            );
-
+          } else if (
+            !subscription.packageGroupId.isSeatable &&
+            (order?.discount === 100 ||
+              subscription.packageGroupId.discount === 100)
+          ) {
             await this.paymentService.updatePaymentStatus(
               payment._id,
               PaymentStatus.SUCCESS
             );
-            await this.cartService.deleteCartByCustomerId(payment.customerId);
-          } else {
-            order = await this.orderService.createOrder({
-              customerId: customer.companyId,
-              status: OrderStatus.PAID,
-              totalPrice: packages.price,
-              discount: 0,
-              subscriptions: [
-                {
-                  packageGroupId: packages._id,
-                  price: packages.price,
-                  unitPrice: packages.price,
-                  durationType: 1,
-                },
-              ],
-            });
-            payment = await this.paymentService.createPayment({
-              customerId: customer.companyId,
-              paidPrice: packages.price,
-              currency: "EUR",
-              status: PaymentStatus.SUCCESS,
-              orderId: order.id,
+            await this.orderService.updateOrderStatus(
+              payment.orderId,
+              OrderStatus.PAID
+            );
+            const currentDate = new Date();
+            const subscriptionEndISO = new Date(
+              subscription.endsAt
+            ).toISOString();
+            await new PaymentsCreatedPublisher(channel, [
+              "payments-created",
+            ]).publish({
+              messageId: uuidv4(),
+              type: "PAYMENTS_CREATED",
+              body: {
+                packageGroupId: subscription.packageGroupId._id,
+                customerId: payment!.customerId,
+                subscriptionStart: currentDate.toISOString(),
+                subscriptionEnd: subscriptionEndISO,
+                paymentId: payment!._id.toString(),
+              },
             });
           }
 
-          new PaymentsCreatedPublisher(channel, ["payments-created"]).publish({
-            messageId: uuidv4(),
-            type: "PAYMENTS_CREATED",
-            body: {
-              packageGroupId: packages._id,
-              customerId: payment!.customerId,
-              subscriptionStart: formattedCurrentPeriodStart,
-              subscriptionEnd: formattedCurrentPeriodEnd,
-              paymentId: payment!._id.toString(),
-            },
-          });
-
-          new EventNotificationPublisher(channel).publish({
+          await new EventNotificationPublisher(channel).publish({
             messageId: uuidv4(),
             type: "NOTIFICATION_EVENT",
             body: {
-              text: `inmidi kullanıcısı ${customer.authorizedPersonName} ${packages.title} aldı.`,
+              text: `inmidi kullanıcısı ${customer.authorizedPersonName} ${subscription.packageGroupId.title} aldı.`,
               title: `Paket satın aldı`,
               type: "COMPANY_INFO",
             },
           });
+        })
+      );
+
+      return res.status(200).json({ received: true });
+    } else if (event.type === "customer.subscription.updated") {
+      console.log("i am in subscription updated");
+      const eventData = event.data.object;
+      const subscriptionId = eventData.id;
+      const subscriptionStart = eventData.current_period_start;
+      const subscriptionEnd = eventData.current_period_end;
+
+      const formattedCurrentPeriodEnd = new Date(
+        subscriptionEnd * 1000
+      ).toISOString();
+      const formattedCurrentPeriodStart = new Date(
+        subscriptionStart * 1000
+      ).toISOString();
+
+      const subscription: any = await stripeApi.subscriptions.retrieve(
+        subscriptionId as string,
+        {
+          expand: ["latest_invoice"],
         }
+      );
+
+      if (subscription.plan.nickname === SubscriptionsType.INMIDI_SUBS) {
+        const packages = await this.packagesService.getPackageByType(
+          subscription.plan.nickname
+        );
+
+        const stripeCustomer: any = await stripeApi.customers.retrieve(
+          subscription.customer as string
+        );
+
+        const customer =
+          await this.companyService.findCompanyByAuthorizedPersonEmail(
+            stripeCustomer.email as string
+          );
+
+        if (!customer) {
+          return res
+            .status(404)
+            .json({ message: i18n.__("customer_not_found") });
+        }
+
+        if (eventData.cancel_at_period_end) {
+          return res.status(200).json({ received: true });
+        }
+
+        let payment: PaymentsDoc | null =
+          await this.paymentService.getPaymentByCustomerId(customer?.companyId);
+
+        let order: Partial<OrderDoc> | null = null;
+
+        if (payment) {
+          console.log("order updated in webhook");
+
+          order = await this.orderService.getOrderById(payment.orderId);
+          await this.orderService.updateOrderStatus(
+            order!._id,
+            OrderStatus.PAID
+          );
+
+          await this.paymentService.updatePaymentStatus(
+            payment._id,
+            PaymentStatus.SUCCESS
+          );
+
+          const cart: any = await this.cartService.getCarByCustomerId(
+            payment.customerId
+          );
+
+          console.log(cart, "cart");
+
+          if (cart?.couponId) {
+            console.log("i am here");
+            await this.couponUsageService.updateCouponUsed(
+              cart?.couponId,
+              cart._id
+            );
+          }
+
+          await this.cartService.deleteCartByCustomerId(payment.customerId);
+        } else {
+          order = await this.orderService.createOrder({
+            customerId: customer.companyId,
+            status: OrderStatus.PAID,
+            totalPrice: packages.price,
+            discount: 0,
+            subscriptions: [
+              {
+                packageGroupId: packages._id,
+                price: packages.price,
+                unitPrice: packages.price,
+                durationType: 1,
+              },
+            ],
+          });
+          payment = await this.paymentService.createPayment({
+            customerId: customer.companyId,
+            paidPrice: packages.price,
+            currency: "EUR",
+            status: PaymentStatus.SUCCESS,
+            orderId: order.id,
+          });
+        }
+
+        await new PaymentsCreatedPublisher(channel, [
+          "payments-created",
+        ]).publish({
+          messageId: uuidv4(),
+          type: "PAYMENTS_CREATED",
+          body: {
+            packageGroupId: packages._id,
+            customerId: payment!.customerId,
+            subscriptionStart: formattedCurrentPeriodStart,
+            subscriptionEnd: formattedCurrentPeriodEnd,
+            paymentId: payment!._id.toString(),
+          },
+        });
+
+        await new EventNotificationPublisher(channel).publish({
+          messageId: uuidv4(),
+          type: "NOTIFICATION_EVENT",
+          body: {
+            text: `inmidi kullanıcısı ${customer.authorizedPersonName} ${packages.title} aldı.`,
+            title: `Paket satın aldı`,
+            type: "COMPANY_INFO",
+          },
+        });
       }
 
-      res.json({ received: true });
-    } catch (error: any) {
-      console.log(error);
-      return res.status(400).send(`Webhook Error: ${error.message}`);
+      return res.status(200).json({ received: true });
     }
   }
 }

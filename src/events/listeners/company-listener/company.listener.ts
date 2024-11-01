@@ -30,8 +30,6 @@ export class CompanyListener extends Listener {
     this.setupEventListeners();
   }
 
-  onMessage(data: CompanyEvent["body"], type: string, msg: ConsumeMessage) {}
-
   private setupEventListeners() {
     this.emitter.on(Subjects.NEW_COMPANY_REGISTERED, (data, msg) => {
       console.log("Event received:", Subjects.NEW_COMPANY_REGISTERED);
@@ -60,13 +58,13 @@ export class CompanyListener extends Listener {
 
       if (!isValidEventData) {
         this.channel!.nack(msg, false, false);
-        return;
+      } else {
+        this.handleCompanyInfoUpdatedEventCompleted(
+          data,
+          Subjects.COMPANY_INFO_UPDATED,
+          msg
+        );
       }
-      this.handleCompanyInfoUpdatedEventCompleted(
-        data,
-        Subjects.COMPANY_INFO_UPDATED,
-        msg
-      );
     });
   }
 
@@ -104,13 +102,15 @@ export class CompanyListener extends Listener {
     msg: ConsumeMessage
   ) {
     try {
+      console.log("data", data);
       await Company.updateOne(
         { companyId: data.id },
         { $set: { companyName: data.name, companyInfoStatus: "ACTIVE" } }
       );
       this.channel!.ack(msg);
     } catch (error: any) {
-      this.handleErrors(type, msg, error);
+      // this.handleErrors(type, msg, error);
+      console.log("error", error);
     }
   }
 

@@ -23,6 +23,10 @@ class CartService {
     return cart;
   }
 
+  async checkCartIsExist(customerId: number) {
+    return await Cart.findOne({ customerId });
+  }
+
   async getCart(customerId: number) {
     const cart = await Cart.findOne({ customerId }).populate(
       "items.packageGroupId",
@@ -33,7 +37,10 @@ class CartService {
 
   async getCartByCustomerId(customerId: number) {
     const cart = await Cart.findOne({ customerId })
-      .populate("items.packageGroupId", "title price isSeatable icon type")
+      .populate(
+        "items.packageGroupId",
+        "title price isSeatable icon type discount"
+      )
       .lean();
     if (!cart) {
       return cart;
@@ -46,8 +53,11 @@ class CartService {
         type: item.packageGroupId.type,
         isSeatable: item.packageGroupId.isSeatable,
         price: {
-          price: item.packageGroupId.price,
-          totalPrice: item.price,
+          price:
+            item.packageGroupId.price -
+            (item.packageGroupId.price * item.packageGroupId.discount) / 100,
+          totalPrice:
+            item.price - (item.price * item.packageGroupId.discount) / 100,
           currency: PaymentCurrency.EUR,
           currencyPrefix: "€",
           ...(item.numberOfSeats ? { numberOfSeats: item.numberOfSeats } : {}),
@@ -81,6 +91,22 @@ class CartService {
     return cart;
   }
 
+  async getCarByCustomerId(customerId: number) {
+    const cart = await Cart.findOne({ customerId });
+    return cart;
+  }
+
+  async deleteCouponFromCart(cartId: string) {
+    const cart = await this.getCartById(cartId);
+    if (cart) {
+      cart.discount = 0;
+      cart.couponId = undefined;
+      return await cart.save();
+    } else {
+      return null;
+    }
+  }
+
   async getCartById(cartId: string) {
     const cart = await Cart.findById(cartId).populate(
       "items.packageGroupId",
@@ -89,8 +115,8 @@ class CartService {
     return cart;
   }
 
-  async getCartByUserId(userId: number) {
-    const cart = await Cart.findOne({ userId });
+  async getCartByUserId(customerId: number) {
+    const cart = await Cart.findOne({ customerId });
     return cart;
   }
 }

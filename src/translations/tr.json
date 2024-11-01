@@ -44,5 +44,9 @@
   "coupon_deactivated": "Kupon aktif değil",
   "coupon_already_used": "Kupon zaten kullanılmış",
   "coupon_already_used_in_this_cart": "Kupon bu sepet için zaten kullanılmış",
-  "coupon_duration_invalid": "Geçersiz kupon bitiş süresi"
+  "coupon_duration_invalid": "Geçersiz kupon bitiş süresi",
+  "trial_duration_only_for_subs": "Deneme süresi kuponu sadece abonelik paketlerinde kullanılabilir",
+  "trial_duration_only_for_100_discount": "Deneme süresi kuponu sadece %100 indirimli kuponlarda kullanılabilir",
+  "coupon_only_for_one_company": "Kupon sadece bir şirket için bir kez kullanılabilir",
+  "coupon_only_used_for_subs": "Kupon sadece abonelik paketlerinde kullanılabilir"
 }

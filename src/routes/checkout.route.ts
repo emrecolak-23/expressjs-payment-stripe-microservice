@@ -6,6 +6,7 @@ import {
   CartService,
   SubscriptionPackageService,
   CouponService,
+  CouponUsageService,
 } from "../services";
 
 import { currentUser, requireAuth } from "../middlewares";
@@ -21,14 +22,15 @@ function checkoutRoutes(): Router {
   const cartService = CartService.getInstance();
   const packagesService = SubscriptionPackageService.getInstance();
   const couponService = CouponService.getInstance();
-
+  const couponUsageService = CouponUsageService.getInstance();
   const checkoutController = new CheckoutController(
     orderService,
     paymentService,
     companyService,
     cartService,
     packagesService,
-    couponService
+    couponService,
+    couponUsageService
   );
 
   const router = express.Router();

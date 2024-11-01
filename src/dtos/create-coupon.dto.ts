@@ -3,4 +3,6 @@ export interface CreateCouponDto {
   discount: number;
   expirationDate: Date;
   isSubs: boolean;
+  trialDuration?: number;
+  isOnlyForOneCompany: boolean;
 }

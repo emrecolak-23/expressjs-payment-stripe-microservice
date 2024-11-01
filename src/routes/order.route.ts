@@ -5,6 +5,7 @@ import {
   CartService,
   PaymentService,
   CouponService,
+  CouponUsageService,
 } from "../services";
 import { OrderController } from "../controllers";
 import { currentUser, requireAuth } from "../middlewares";
@@ -18,12 +19,14 @@ function orderRoutes(): Router {
   const cartService = CartService.getInstance();
   const subscriptionPackageService = SubscriptionPackageService.getInstance();
   const couponService = CouponService.getInstance();
+  const couponUsageService = CouponUsageService.getInstance();
   const orderController = OrderController.getInstance(
     orderService,
     subscriptionPackageService,
     cartService,
     paymentsService,
-    couponService
+    couponService,
+    couponUsageService
   );
 
   const router = express.Router();

@@ -16,17 +16,30 @@ export class CouponService {
     this.couponModel = Coupon;
   }
 
-  async createCoupon(params: CreateCouponDto, session: mongoose.ClientSession) {
-    const { authorizationName, discount, expirationDate, isSubs } = params;
-
-    const couponCode = this.createCouponCode(authorizationName, discount);
-
-    const coupon = this.couponModel.build({
-      code: couponCode,
+  async createCoupon(
+    params: CreateCouponDto,
+    session?: mongoose.ClientSession
+  ) {
+    const {
       authorizationName,
       discount,
       expirationDate,
       isSubs,
+      trialDuration,
+      isOnlyForOneCompany,
+    } = params;
+
+    // const couponCode = this.createCouponCode(authorizationName, discount);
+
+    const coupon = this.couponModel.build({
+      code: authorizationName,
+      authorizationName,
+      discount,
+      expirationDate,
+      isSubs,
+      isSingleUse: isSubs && !trialDuration ? false : true,
+      ...(trialDuration ? { trialDuration } : {}),
+      isOnlyForOneCompany,
     });
 
     await coupon.save({ session });

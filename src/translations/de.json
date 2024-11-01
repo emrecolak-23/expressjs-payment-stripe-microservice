@@ -41,5 +41,9 @@
   "coupon_deactivated": "Coupon deaktiviert",
   "coupon_already_used": "Coupon bereits verwendet",
   "coupon_already_used_in_this_cart": "Coupon wurde bereits in diesem Warenkorb verwendet",
-  "coupon_duration_invalid": "Ungültige Coupon-Dauer"
+  "coupon_duration_invalid": "Ungültige Coupon-Dauer",
+  "trial_duration_only_for_subs": "Testdauer-Coupon kann nur in Abonnementpaketen verwendet werden",
+  "trial_duration_only_for_100_discount": "Testdauer-Coupon kann nur in %100 rabattierten Coupons verwendet werden",
+  "coupon_only_for_one_company": "Coupon kann nur einmal für ein Unternehmen verwendet werden",
+  "coupon_only_used_for_subs": "Coupon kann nur in Abonnementpaketen verwendet werden"
 }

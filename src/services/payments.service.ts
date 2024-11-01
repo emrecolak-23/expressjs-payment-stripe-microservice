@@ -33,7 +33,9 @@ class PaymentService {
       status: params.status,
       orderId: params.orderId,
     });
+
     await payment.save();
+    console.log("payment", payment);
     return payment;
   }
 
@@ -73,7 +75,7 @@ class PaymentService {
       })
       .sort({ createdAt: -1 })
       .limit(1);
-
+    console.log(payments, "payments in db");
     return payments && payments.length ? payments[0] : null;
   }
 

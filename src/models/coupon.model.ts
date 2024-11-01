@@ -6,6 +6,9 @@ export interface CouponAttrs {
   discount: number;
   expirationDate: Date;
   isSubs: boolean;
+  isSingleUse: boolean;
+  trialDuration?: number;
+  isOnlyForOneCompany?: boolean;
 }
 
 export interface CouponDoc extends Document {
@@ -15,6 +18,9 @@ export interface CouponDoc extends Document {
   expirationDate: Date;
   isActive: boolean;
   isSubs: boolean;
+  isSingleUse: boolean;
+  trialDuration?: number;
+  isOnlyForOneCompany?: boolean;
 }
 
 export interface CouponModel extends Model<CouponDoc> {
@@ -45,9 +51,16 @@ const couponSchema = new Schema(
     },
     isSingleUse: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     isSubs: {
+      type: Boolean,
+      default: false,
+    },
+    trialDuration: {
+      type: Number,
+    },
+    isOnlyForOneCompany: {
       type: Boolean,
       default: false,
     },

@@ -1,0 +1,20 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.routes = void 0;
+const express_1 = __importDefault(require("express"));
+exports.routes = express_1.default.Router();
+const payment_route_1 = require("./payment.route");
+const order_route_1 = require("./order.route");
+const cart_route_1 = require("./cart.route");
+const checkout_route_1 = require("./checkout.route");
+const portal_route_1 = require("./portal.route");
+const coupon_route_1 = require("./coupon.route");
+exports.routes.use("/inmidi-payments", (0, payment_route_1.paymentRoutes)());
+exports.routes.use("/inmidi-order", (0, order_route_1.orderRoutes)());
+exports.routes.use("/inmidi-cart", (0, cart_route_1.cartRoutes)());
+exports.routes.use("/checkout", (0, checkout_route_1.checkoutRoutes)());
+exports.routes.use("/inmidi-portal", (0, portal_route_1.portalRotues)());
+exports.routes.use("/inmidi-coupon", (0, coupon_route_1.couponRoutes)());
